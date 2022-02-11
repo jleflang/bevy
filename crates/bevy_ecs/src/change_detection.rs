@@ -1,6 +1,7 @@
 //! Types that detect when their internal data mutate.
 
-use crate::component::{Component, ComponentTicks};
+use crate::{component::ComponentTicks, system::Resource};
+#[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
 use std::ops::{Deref, DerefMut};
 
@@ -147,14 +148,14 @@ pub(crate) struct Ticks<'a> {
 /// Panics when used as a [`SystemParam`](crate::system::SystemParam) if the resource does not exist.
 ///
 /// Use `Option<ResMut<T>>` instead if the resource might not always exist.
-pub struct ResMut<'a, T: Component> {
+pub struct ResMut<'a, T: Resource> {
     pub(crate) value: &'a mut T,
     pub(crate) ticks: Ticks<'a>,
 }
 
-change_detection_impl!(ResMut<'a, T>, T, Component);
-impl_into_inner!(ResMut<'a, T>, T, Component);
-impl_debug!(ResMut<'a, T>, Component);
+change_detection_impl!(ResMut<'a, T>, T, Resource);
+impl_into_inner!(ResMut<'a, T>, T, Resource);
+impl_debug!(ResMut<'a, T>, Resource);
 
 /// Unique borrow of a non-[`Send`] resource.
 ///
@@ -188,9 +189,13 @@ impl_into_inner!(Mut<'a, T>, T,);
 impl_debug!(Mut<'a, T>,);
 
 /// Unique mutable borrow of a Reflected component
+#[cfg(feature = "bevy_reflect")]
 pub struct ReflectMut<'a> {
     pub(crate) value: &'a mut dyn Reflect,
     pub(crate) ticks: Ticks<'a>,
 }
 
+#[cfg(feature = "bevy_reflect")]
 change_detection_impl!(ReflectMut<'a>, dyn Reflect,);
+#[cfg(feature = "bevy_reflect")]
+impl_into_inner!(ReflectMut<'a>, dyn Reflect,);

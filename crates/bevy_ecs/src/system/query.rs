@@ -2,8 +2,8 @@ use crate::{
     component::Component,
     entity::Entity,
     query::{
-        Fetch, FilterFetch, QueryCombinationIter, QueryEntityError, QueryIter, QueryState,
-        ReadOnlyFetch, WorldQuery,
+        Fetch, FilterFetch, NopFetch, QueryCombinationIter, QueryEntityError, QueryIter,
+        QueryState, WorldQuery,
     },
     world::{Mut, World},
 };
@@ -43,14 +43,17 @@ use thiserror::Error;
 /// immutably helps system parallelization.
 ///
 /// ```
+/// # use bevy_ecs::component::Component;
 /// # use bevy_ecs::system::IntoSystem;
 /// # use bevy_ecs::system::Query;
+/// # #[derive(Component)]
 /// # struct ComponentA;
+/// # #[derive(Component)]
 /// # struct ComponentB;
 /// # fn system(
 /// query: Query<(&ComponentA, &ComponentB)>
 /// # ) {}
-/// # system.system();
+/// # bevy_ecs::system::assert_is_system(system);
 /// ```
 ///
 /// ## Mutable component access
@@ -60,15 +63,18 @@ use thiserror::Error;
 /// in the same query.
 ///
 /// ```
+/// # use bevy_ecs::component::Component;
 /// # use bevy_ecs::system::IntoSystem;
 /// # use bevy_ecs::system::Query;
+/// # #[derive(Component)]
 /// # struct ComponentA;
+/// # #[derive(Component)]
 /// # struct ComponentB;
 /// # fn system(
 /// // `ComponentA` is accessed mutably, while `ComponentB` is accessed immutably.
 /// mut query: Query<(&mut ComponentA, &ComponentB)>
 /// # ) {}
-/// # system.system();
+/// # bevy_ecs::system::assert_is_system(system);
 /// ```
 ///
 /// Two systems cannot be executed in parallel if both access a certain component and
@@ -85,15 +91,15 @@ use thiserror::Error;
 /// will give access to the entity ID.
 ///
 /// ```
-/// # use bevy_ecs::entity::Entity;
-/// # use bevy_ecs::system::IntoSystem;
-/// # use bevy_ecs::system::Query;
+/// # use bevy_ecs::prelude::*;
+/// # #[derive(Component)]
 /// # struct ComponentA;
+/// # #[derive(Component)]
 /// # struct ComponentB;
 /// # fn system(
 /// query: Query<(Entity, &ComponentA, &ComponentB)>
 /// # ) {}
-/// # system.system();
+/// # bevy_ecs::system::assert_is_system(system);
 /// ```
 ///
 /// ## Query filtering
@@ -102,33 +108,35 @@ use thiserror::Error;
 /// out the query results that don't satisfy the given condition.
 ///
 /// ```
-/// # use bevy_ecs::query::With;
-/// # use bevy_ecs::system::IntoSystem;
-/// # use bevy_ecs::system::Query;
+/// # use bevy_ecs::prelude::*;
+/// # #[derive(Component)]
 /// # struct ComponentA;
+/// # #[derive(Component)]
 /// # struct ComponentB;
+/// # #[derive(Component)]
 /// # struct ComponentC;
 /// # fn system(
 /// // `ComponentC` data won't be accessed, but only entities that contain it will be queried.
 /// query: Query<(&ComponentA, &ComponentB), With<ComponentC>>
 /// # ) {}
-/// # system.system();
+/// # bevy_ecs::system::assert_is_system(system);
 /// ```
 ///
 /// If you need to apply more filters in a single query, group them into a tuple:
 ///
 /// ```
-/// # use bevy_ecs::query::{Changed, With};
-/// # use bevy_ecs::system::IntoSystem;
-/// # use bevy_ecs::system::Query;
+/// # use bevy_ecs::prelude::*;
+/// # #[derive(Component)]
 /// # struct ComponentA;
+/// # #[derive(Component)]
 /// # struct ComponentB;
+/// # #[derive(Component)]
 /// # struct ComponentC;
 /// # fn system(
 /// // Similar to the previous query, but with the addition of a `Changed` filter.
 /// query: Query<(&ComponentA, &ComponentB), (With<ComponentC>, Changed<ComponentA>)>
 /// # ) {}
-/// # system.system();
+/// # bevy_ecs::system::assert_is_system(system);
 /// ```
 ///
 /// The following list contains all the available query filters:
@@ -146,14 +154,15 @@ use thiserror::Error;
 /// `ComponentA` and `ComponentB`, and entities that contain `ComponentA` but not `ComponentB`.
 ///
 /// ```
-/// # use bevy_ecs::system::IntoSystem;
-/// # use bevy_ecs::system::Query;
+/// # use bevy_ecs::prelude::*;
+/// # #[derive(Component)]
 /// # struct ComponentA;
+/// # #[derive(Component)]
 /// # struct ComponentB;
 /// # fn system(
 /// query: Query<(&ComponentA, Option<&ComponentB>)>
 /// # ) {}
-/// # system.system();
+/// # bevy_ecs::system::assert_is_system(system);
 /// ```
 ///
 /// If an entity does not contain a component, its corresponding query result value will be
@@ -168,20 +177,20 @@ use thiserror::Error;
 /// of `Query` can be omitted.
 ///
 /// ```
-/// # use bevy_ecs::system::IntoSystem;
-/// # use bevy_ecs::system::Query;
+/// # use bevy_ecs::prelude::*;
+/// # #[derive(Component)]
 /// # struct MyComponent;
 /// # fn tuple_system(
 /// // This is correct, but can be avoided.
 /// query: Query<(&MyComponent,)>
 /// # ) {}
-/// # tuple_system.system();
+/// # bevy_ecs::system::assert_is_system(tuple_system);
 ///
 /// # fn non_tuple_system(
-/// // This is the preferred method.    
+/// // This is the preferred method.
 /// query: Query<&MyComponent>
 /// # ) {}
-/// # non_tuple_system.system();
+/// # bevy_ecs::system::assert_is_system(non_tuple_system);
 /// ```
 ///
 /// # Usage of query results
@@ -197,17 +206,18 @@ use thiserror::Error;
 /// for advanced iterator usage.
 ///
 /// ```
-/// # use bevy_ecs::system::IntoSystem;
-/// # use bevy_ecs::system::Query;
+/// # use bevy_ecs::prelude::*;
+/// # #[derive(Component)]
 /// # struct ComponentA;
+/// # #[derive(Component)]
 /// # struct ComponentB;
-/// fn immutable_query_system(mut query: Query<(&ComponentA, &ComponentB)>) {
+/// fn immutable_query_system(query: Query<(&ComponentA, &ComponentB)>) {
 ///     for (a, b) in query.iter() {
 ///         // Here, `a` and `b` are normal references to components, relatively of
 ///         // `&ComponentA` and `&ComponentB` types.
 ///     }
 /// }
-/// # immutable_query_system.system();
+/// # bevy_ecs::system::assert_is_system(immutable_query_system);
 ///
 /// fn mutable_query_system(mut query: Query<(&mut ComponentA, &ComponentB)>) {
 ///     for (mut a, b) in query.iter_mut() {
@@ -215,7 +225,7 @@ use thiserror::Error;
 ///         // Note the usage of `mut` in the tuple and the call to `iter_mut` instead of `iter`.
 ///     }
 /// }
-/// # mutable_query_system.system();
+/// # bevy_ecs::system::assert_is_system(mutable_query_system);
 /// ```
 ///
 /// ## Getting the query result for a particular entity
@@ -267,8 +277,8 @@ where
 
     /// Returns an [`Iterator`] over the query results.
     ///
-    /// This can only be called for read-only queries (due to the [`ReadOnlyFetch`] trait
-    /// bound). See [`Self::iter_mut`] for queries that contain at least one mutable component.
+    /// This can only return immutable data (mutable data will be cast to an immutable form).
+    /// See [`Self::iter_mut`] for queries that contain at least one mutable component.
     ///
     /// # Example
     ///
@@ -278,6 +288,7 @@ where
     /// ```
     /// # use bevy_ecs::prelude::*;
     /// #
+    /// # #[derive(Component)]
     /// # struct Player { name: String }
     /// #
     /// fn report_names_system(query: Query<&Player>) {
@@ -285,13 +296,10 @@ where
     ///         println!("Say hello to {}!", player.name);
     ///     }
     /// }
-    /// # report_names_system.system();
+    /// # bevy_ecs::system::assert_is_system(report_names_system);
     /// ```
     #[inline]
-    pub fn iter(&'s self) -> QueryIter<'w, 's, Q, F>
-    where
-        Q::Fetch: ReadOnlyFetch,
-    {
+    pub fn iter(&'s self) -> QueryIter<'w, 's, Q, Q::ReadOnlyFetch, F> {
         // SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         unsafe {
@@ -310,6 +318,7 @@ where
     /// ```
     /// # use bevy_ecs::prelude::*;
     /// #
+    /// # #[derive(Component)]
     /// # struct Velocity { x: f32, y: f32, z: f32 }
     /// fn gravity_system(mut query: Query<&mut Velocity>) {
     ///     const DELTA: f32 = 1.0 / 60.0;
@@ -317,10 +326,10 @@ where
     ///         velocity.y -= 9.8 * DELTA;
     ///     }
     /// }
-    /// # gravity_system.system();
+    /// # bevy_ecs::system::assert_is_system(gravity_system);
     /// ```
     #[inline]
-    pub fn iter_mut(&mut self) -> QueryIter<'_, '_, Q, F> {
+    pub fn iter_mut(&mut self) -> QueryIter<'_, '_, Q, Q::Fetch, F> {
         // SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         unsafe {
@@ -330,17 +339,16 @@ where
     }
 
     /// Returns an [`Iterator`] over all possible combinations of `K` query results without repetition.
-    /// This can only be called for read-only queries
+    /// This can only return immutable data
     ///
     ///  For permutations of size K of query returning N results, you will get:
     /// - if K == N: one permutation of all query results
     /// - if K < N: all possible K-sized combinations of query results, without repetition
     /// - if K > N: empty set (no K-sized combinations exist)
     #[inline]
-    pub fn iter_combinations<const K: usize>(&self) -> QueryCombinationIter<'_, '_, Q, F, K>
-    where
-        Q::Fetch: ReadOnlyFetch,
-    {
+    pub fn iter_combinations<const K: usize>(
+        &self,
+    ) -> QueryCombinationIter<'_, '_, Q, Q::ReadOnlyFetch, F, K> {
         // SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         unsafe {
@@ -358,8 +366,9 @@ where
     /// In order to iterate it, use `fetch_next` method with `while let Some(..)` loop pattern.
     ///
     /// ```
-    /// # struct A;
     /// # use bevy_ecs::prelude::*;
+    /// #[derive(Component)]
+    /// # struct A;
     /// # fn some_system(mut query: Query<&mut A>) {
     /// // iterate using `fetch_next` in while loop
     /// let mut combinations = query.iter_combinations_mut();
@@ -376,7 +385,7 @@ where
     #[inline]
     pub fn iter_combinations_mut<const K: usize>(
         &mut self,
-    ) -> QueryCombinationIter<'_, '_, Q, F, K> {
+    ) -> QueryCombinationIter<'_, '_, Q, Q::Fetch, F, K> {
         // SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         unsafe {
@@ -395,7 +404,7 @@ where
     /// This function makes it possible to violate Rust's aliasing guarantees. You must make sure
     /// this call does not result in multiple mutable references to the same component
     #[inline]
-    pub unsafe fn iter_unsafe(&self) -> QueryIter<'_, '_, Q, F> {
+    pub unsafe fn iter_unsafe(&'s self) -> QueryIter<'w, 's, Q, Q::Fetch, F> {
         // SEMI-SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         self.state
@@ -411,7 +420,7 @@ where
     #[inline]
     pub unsafe fn iter_combinations_unsafe<const K: usize>(
         &self,
-    ) -> QueryCombinationIter<'_, '_, Q, F, K> {
+    ) -> QueryCombinationIter<'_, '_, Q, Q::Fetch, F, K> {
         // SEMI-SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         self.state.iter_combinations_unchecked_manual(
@@ -424,7 +433,7 @@ where
     /// Runs `f` on each query result. This is faster than the equivalent iter() method, but cannot
     /// be chained like a normal [`Iterator`].
     ///
-    /// This can only be called for read-only queries, see [`Self::for_each_mut`] for write-queries.
+    /// This can only pass in immutable data, see [`Self::for_each_mut`] for mutable access.
     ///
     /// # Example
     ///
@@ -434,6 +443,7 @@ where
     /// ```
     /// # use bevy_ecs::prelude::*;
     /// #
+    /// # #[derive(Component)]
     /// # struct Player { name: String }
     /// #
     /// fn report_names_system(query: Query<&Player>) {
@@ -441,22 +451,20 @@ where
     ///         println!("Say hello to {}!", player.name);
     ///     });
     /// }
-    /// # report_names_system.system();
+    /// # bevy_ecs::system::assert_is_system(report_names_system);
     /// ```
     #[inline]
-    pub fn for_each(&'s self, f: impl FnMut(<Q::Fetch as Fetch<'w, 's>>::Item))
-    where
-        Q::Fetch: ReadOnlyFetch,
-    {
+    pub fn for_each<FN: FnMut(<Q::ReadOnlyFetch as Fetch<'w, 's>>::Item)>(&'s self, f: FN) {
         // SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         unsafe {
-            self.state.for_each_unchecked_manual(
-                self.world,
-                f,
-                self.last_change_tick,
-                self.change_tick,
-            )
+            self.state
+                .for_each_unchecked_manual::<Q::ReadOnlyFetch, FN>(
+                    self.world,
+                    f,
+                    self.last_change_tick,
+                    self.change_tick,
+                )
         };
     }
 
@@ -471,6 +479,7 @@ where
     /// ```
     /// # use bevy_ecs::prelude::*;
     /// #
+    /// # #[derive(Component)]
     /// # struct Velocity { x: f32, y: f32, z: f32 }
     /// fn gravity_system(mut query: Query<&mut Velocity>) {
     ///     const DELTA: f32 = 1.0 / 60.0;
@@ -478,14 +487,14 @@ where
     ///         velocity.y -= 9.8 * DELTA;
     ///     });
     /// }
-    /// # gravity_system.system();
+    /// # bevy_ecs::system::assert_is_system(gravity_system);
     /// ```
     #[inline]
-    pub fn for_each_mut<'a>(&'a mut self, f: impl FnMut(<Q::Fetch as Fetch<'a, 'a>>::Item)) {
+    pub fn for_each_mut<'a, FN: FnMut(<Q::Fetch as Fetch<'a, 'a>>::Item)>(&'a mut self, f: FN) {
         // SAFE: system runs without conflicts with other systems. same-system queries have runtime
         // borrow checks when they conflict
         unsafe {
-            self.state.for_each_unchecked_manual(
+            self.state.for_each_unchecked_manual::<Q::Fetch, FN>(
                 self.world,
                 f,
                 self.last_change_tick,
@@ -496,43 +505,42 @@ where
 
     /// Runs `f` on each query result in parallel using the given task pool.
     ///
-    /// This can only be called for read-only queries, see [`Self::par_for_each_mut`] for
-    /// write-queries.
+    /// This can only be called for immutable data, see [`Self::par_for_each_mut`] for
+    /// mutable access.
     #[inline]
-    pub fn par_for_each(
+    pub fn par_for_each<FN: Fn(<Q::ReadOnlyFetch as Fetch<'w, 's>>::Item) + Send + Sync + Clone>(
         &'s self,
         task_pool: &TaskPool,
         batch_size: usize,
-        f: impl Fn(<Q::Fetch as Fetch<'w, 's>>::Item) + Send + Sync + Clone,
-    ) where
-        Q::Fetch: ReadOnlyFetch,
-    {
+        f: FN,
+    ) {
         // SAFE: system runs without conflicts with other systems. same-system queries have runtime
         // borrow checks when they conflict
         unsafe {
-            self.state.par_for_each_unchecked_manual(
-                self.world,
-                task_pool,
-                batch_size,
-                f,
-                self.last_change_tick,
-                self.change_tick,
-            )
+            self.state
+                .par_for_each_unchecked_manual::<Q::ReadOnlyFetch, FN>(
+                    self.world,
+                    task_pool,
+                    batch_size,
+                    f,
+                    self.last_change_tick,
+                    self.change_tick,
+                )
         };
     }
 
     /// Runs `f` on each query result in parallel using the given task pool.
     #[inline]
-    pub fn par_for_each_mut<'a>(
+    pub fn par_for_each_mut<'a, FN: Fn(<Q::Fetch as Fetch<'a, 'a>>::Item) + Send + Sync + Clone>(
         &'a mut self,
         task_pool: &TaskPool,
         batch_size: usize,
-        f: impl Fn(<Q::Fetch as Fetch<'a, 'a>>::Item) + Send + Sync + Clone,
+        f: FN,
     ) {
         // SAFE: system runs without conflicts with other systems. same-system queries have runtime
         // borrow checks when they conflict
         unsafe {
-            self.state.par_for_each_unchecked_manual(
+            self.state.par_for_each_unchecked_manual::<Q::Fetch, FN>(
                 self.world,
                 task_pool,
                 batch_size,
@@ -548,8 +556,8 @@ where
     /// In case of a nonexisting entity or mismatched component, a [`QueryEntityError`] is
     /// returned instead.
     ///
-    /// This can only be called for read-only queries (due to the [`ReadOnlyFetch`] trait bound).
-    /// see [`get_mut`](Self::get_mut) for queries that contain at least one mutable component.
+    /// This can only return immutable data (mutable data will be cast to an immutable form).
+    /// See [`get_mut`](Self::get_mut) for queries that contain at least one mutable component.
     ///
     /// # Example
     ///
@@ -560,6 +568,7 @@ where
     /// # use bevy_ecs::prelude::*;
     /// #
     /// # struct SelectedCharacter { entity: Entity }
+    /// # #[derive(Component)]
     /// # struct Character { name: String }
     /// #
     /// fn print_selected_character_name_system(
@@ -571,20 +580,17 @@ where
     ///         println!("{}", selected_character.name);
     ///     }
     /// }
-    /// # print_selected_character_name_system.system();
+    /// # bevy_ecs::system::assert_is_system(print_selected_character_name_system);
     /// ```
     #[inline]
     pub fn get(
         &'s self,
         entity: Entity,
-    ) -> Result<<Q::Fetch as Fetch<'w, 's>>::Item, QueryEntityError>
-    where
-        Q::Fetch: ReadOnlyFetch,
-    {
+    ) -> Result<<Q::ReadOnlyFetch as Fetch<'w, 's>>::Item, QueryEntityError> {
         // SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         unsafe {
-            self.state.get_unchecked_manual(
+            self.state.get_unchecked_manual::<Q::ReadOnlyFetch>(
                 self.world,
                 entity,
                 self.last_change_tick,
@@ -607,6 +613,7 @@ where
     /// # use bevy_ecs::prelude::*;
     /// #
     /// # struct PoisonedCharacter { character_id: Entity }
+    /// # #[derive(Component)]
     /// # struct Health(u32);
     /// #
     /// fn poison_system(mut query: Query<&mut Health>, poisoned: Res<PoisonedCharacter>) {
@@ -614,7 +621,7 @@ where
     ///         health.0 -= 1;
     ///     }
     /// }
-    /// # poison_system.system();
+    /// # bevy_ecs::system::assert_is_system(poison_system);
     /// ```
     #[inline]
     pub fn get_mut(
@@ -624,7 +631,7 @@ where
         // SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
         unsafe {
-            self.state.get_unchecked_manual(
+            self.state.get_unchecked_manual::<Q::Fetch>(
                 self.world,
                 entity,
                 self.last_change_tick,
@@ -644,13 +651,17 @@ where
     /// this call does not result in multiple mutable references to the same component
     #[inline]
     pub unsafe fn get_unchecked(
-        &self,
+        &'s self,
         entity: Entity,
-    ) -> Result<<Q::Fetch as Fetch>::Item, QueryEntityError> {
+    ) -> Result<<Q::Fetch as Fetch<'w, 's>>::Item, QueryEntityError> {
         // SEMI-SAFE: system runs without conflicts with other systems.
         // same-system queries have runtime borrow checks when they conflict
-        self.state
-            .get_unchecked_manual(self.world, entity, self.last_change_tick, self.change_tick)
+        self.state.get_unchecked_manual::<Q::Fetch>(
+            self.world,
+            entity,
+            self.last_change_tick,
+            self.change_tick,
+        )
     }
 
     /// Returns a reference to the [`Entity`]'s [`Component`] of the given type.
@@ -667,6 +678,7 @@ where
     /// # use bevy_ecs::prelude::*;
     /// #
     /// # struct SelectedCharacter { entity: Entity }
+    /// # #[derive(Component)]
     /// # struct Character { name: String }
     /// #
     /// fn print_selected_character_name_system(
@@ -678,13 +690,10 @@ where
     ///         println!("{}", selected_character.name);
     ///     }
     /// }
-    /// # print_selected_character_name_system.system();
+    /// # bevy_ecs::system::assert_is_system(print_selected_character_name_system);
     /// ```
     #[inline]
-    pub fn get_component<T: Component>(
-        &self,
-        entity: Entity,
-    ) -> Result<&'w T, QueryComponentError> {
+    pub fn get_component<T: Component>(&self, entity: Entity) -> Result<&T, QueryComponentError> {
         let world = self.world;
         let entity_ref = world
             .get_entity(entity)
@@ -724,6 +733,7 @@ where
     /// # use bevy_ecs::prelude::*;
     /// #
     /// # struct PoisonedCharacter { character_id: Entity }
+    /// # #[derive(Component)]
     /// # struct Health(u32);
     /// #
     /// fn poison_system(mut query: Query<&mut Health>, poisoned: Res<PoisonedCharacter>) {
@@ -731,7 +741,7 @@ where
     ///         health.0 -= 1;
     ///     }
     /// }
-    /// # poison_system.system();
+    /// # bevy_ecs::system::assert_is_system(poison_system);
     /// ```
     #[inline]
     pub fn get_component_mut<T: Component>(
@@ -784,21 +794,22 @@ where
     /// Returns a single immutable query result when there is exactly one entity matching
     /// the query.
     ///
-    /// This can only be called for read-only queries (due to the [`ReadOnlyFetch`] trait
-    /// bound). Use [`single_mut`](Self::single_mut) for queries that contain at least one
-    /// mutable component.
+    /// This can only return immutable data. Use [`single_mut`](Self::single_mut) for
+    /// queries that contain at least one mutable component.
     ///
     /// # Example
     ///
     /// ```
-    /// # use bevy_ecs::prelude::{IntoSystem, Query, With};
+    /// # use bevy_ecs::prelude::*;
+    /// # #[derive(Component)]
     /// # struct Player;
+    /// # #[derive(Component)]
     /// # struct Position(f32, f32);
     /// fn player_system(query: Query<&Position, With<Player>>) {
     ///     let player_position = query.single();
     ///     // do something with player_position
     /// }
-    /// # player_system.system();
+    /// # bevy_ecs::system::assert_is_system(player_system);
     /// ```
     ///
     /// # Panics
@@ -806,19 +817,15 @@ where
     /// Panics if the number of query results is not exactly one. Use
     /// [`get_single`](Self::get_single) to return a `Result` instead of panicking.
     #[track_caller]
-    pub fn single(&'s self) -> <Q::Fetch as Fetch<'w, 's>>::Item
-    where
-        Q::Fetch: ReadOnlyFetch,
-    {
+    pub fn single(&'s self) -> <Q::ReadOnlyFetch as Fetch<'w, 's>>::Item {
         self.get_single().unwrap()
     }
 
     /// Returns a single immutable query result when there is exactly one entity matching
     /// the query.
     ///
-    /// This can only be called for read-only queries (due to the [`ReadOnlyFetch`] trait
-    /// bound). Use [`get_single_mut`](Self::get_single_mut) for queries that contain at least one
-    /// mutable component.
+    /// This can only return immutable data. Use [`get_single_mut`](Self::get_single_mut)
+    /// for queries that contain at least one mutable component.
     ///
     /// If the number of query results is not exactly one, a [`QuerySingleError`] is returned
     /// instead.
@@ -826,9 +833,10 @@ where
     /// # Example
     ///
     /// ```
-    ///  # use bevy_ecs::system::{Query, QuerySingleError};
-    ///  # use bevy_ecs::prelude::IntoSystem;
-    ///  # struct PlayerScore(i32);
+    /// # use bevy_ecs::prelude::*;
+    /// # use bevy_ecs::system::QuerySingleError;
+    /// # #[derive(Component)]
+    /// # struct PlayerScore(i32);
     /// fn player_scoring_system(query: Query<&PlayerScore>) {
     ///     match query.get_single() {
     ///         Ok(PlayerScore(score)) => {
@@ -842,12 +850,11 @@ where
     ///         }
     ///     }
     /// }
-    /// # player_scoring_system.system();
+    /// # bevy_ecs::system::assert_is_system(player_scoring_system);
     /// ```
-    pub fn get_single(&'s self) -> Result<<Q::Fetch as Fetch<'w, 's>>::Item, QuerySingleError>
-    where
-        Q::Fetch: ReadOnlyFetch,
-    {
+    pub fn get_single(
+        &'s self,
+    ) -> Result<<Q::ReadOnlyFetch as Fetch<'w, 's>>::Item, QuerySingleError> {
         let mut query = self.iter();
         let first = query.next();
         let extra = query.next().is_some();
@@ -869,14 +876,16 @@ where
     /// ```
     /// # use bevy_ecs::prelude::*;
     /// #
+    /// # #[derive(Component)]
     /// # struct Player;
+    /// # #[derive(Component)]
     /// # struct Health(u32);
     /// #
     /// fn regenerate_player_health_system(mut query: Query<&mut Health, With<Player>>) {
     ///     let mut health = query.single_mut();
     ///     health.0 += 1;
     /// }
-    /// # regenerate_player_health_system.system();
+    /// # bevy_ecs::system::assert_is_system(regenerate_player_health_system);
     /// ```
     ///
     /// # Panics
@@ -899,14 +908,16 @@ where
     /// ```
     /// # use bevy_ecs::prelude::*;
     /// #
+    /// # #[derive(Component)]
     /// # struct Player;
+    /// # #[derive(Component)]
     /// # struct Health(u32);
     /// #
     /// fn regenerate_player_health_system(mut query: Query<&mut Health, With<Player>>) {
     ///     let mut health = query.get_single_mut().expect("Error: Could not find a single player.");
     ///     health.0 += 1;
     /// }
-    /// # regenerate_player_health_system.system();
+    /// # bevy_ecs::system::assert_is_system(regenerate_player_health_system);
     /// ```
     pub fn get_single_mut(
         &mut self,
@@ -934,21 +945,57 @@ where
     /// ```
     /// # use bevy_ecs::prelude::*;
     /// #
+    /// # #[derive(Component)]
     /// # struct Player;
+    /// # #[derive(Component)]
     /// # struct Score(u32);
     /// fn update_score_system(query: Query<(), With<Player>>, mut score: ResMut<Score>) {
     ///     if !query.is_empty() {
     ///         score.0 += 1;
     ///     }
     /// }
-    /// # update_score_system.system();
+    /// # bevy_ecs::system::assert_is_system(update_score_system);
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
-        // TODO: This code can be replaced with `self.iter().next().is_none()` if/when
-        // we sort out how to convert "write" queries to "read" queries.
         self.state
             .is_empty(self.world, self.last_change_tick, self.change_tick)
+    }
+
+    /// Returns `true` if the given [`Entity`] matches the query.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use bevy_ecs::prelude::*;
+    /// #
+    /// # #[derive(Component)]
+    /// # struct InRange;
+    /// #
+    /// # struct Target {
+    /// #     entity: Entity,
+    /// # }
+    /// #
+    /// fn targeting_system(in_range_query: Query<&InRange>, target: Res<Target>) {
+    ///     if in_range_query.contains(target.entity) {
+    ///         println!("Bam!")
+    ///     }
+    /// }
+    /// # targeting_system.system();
+    /// ```
+    #[inline]
+    pub fn contains(&self, entity: Entity) -> bool {
+        // SAFE: NopFetch does not access any members while &self ensures no one has exclusive access
+        unsafe {
+            self.state
+                .get_unchecked_manual::<NopFetch<Q::State>>(
+                    self.world,
+                    entity,
+                    self.last_change_tick,
+                    self.change_tick,
+                )
+                .is_ok()
+        }
     }
 }
 
